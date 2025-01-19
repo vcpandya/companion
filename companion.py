@@ -305,15 +305,26 @@ def play_bot_message():
     """
     Play selected message's bot recording if exists. If not, send text to TTS and play audio
     """
-    index = int(request.form['message_id'].split('_')[1])
-    recordings = memory[index]["recording"]
-    if recordings is None or len(recordings) == 0:
-        app_cache.text2speech_queue.put({"text": request.form["text"], "counter": 0,
-                                         "message_index": index, 'skip_cache': True})
-    else:
-        for r in recordings:
-            put_in_audio_queue(r)
-    return jsonify({'message': 'Recordings inserted to queue'})
+    try:
+        index = int(request.form['message_id'].split('_')[1])
+        if not (0 <= index < len(memory)):
+            return jsonify({'error': f'Invalid index: {index}. Memory length: {len(memory)}'}), 400
+
+        recordings = memory[index]["recording"]
+        if recordings is None or len(recordings) == 0:
+            app_cache.text2speech_queue.put({"text": request.form["text"], "counter": 0,
+                                             "message_index": index, 'skip_cache': True})
+        else:
+            for r in recordings:
+                put_in_audio_queue(r)
+
+        return jsonify({'message': 'Recordings inserted to queue'})
+
+    except ValueError:
+        return jsonify({'error': 'Invalid message_id format'}), 400
+    except Exception as e:
+        app_cache.server_errors.append(utils.get_error_message_from_exception(e))
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/play_user_recording', methods=['POST'])
